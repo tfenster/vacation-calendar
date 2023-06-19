@@ -6,14 +6,19 @@ using System.Text.Json;
 
 // m365 aad app add --name 'Vacation calendar' --redirectUris 'http://localhost/' --platform publicClient --apisDelegated 'https://graph.microsoft.com/Group.ReadWrite.All,https://graph.microsoft.com/Calendars.ReadWrite.Shared,https://graph.microsoft.com/User.Read'
 
+var debugMode = false;
 var groupName = "4PS Deutschland";
 
 // 4PS
-//var clientId = "3c7a97be-5202-4bb8-be17-7123a46657ee";
-//var tenantId = "92f4dd01-f0ea-4b5f-97f2-505c2945189c";
-// ars solvendi
-var clientId = "43e13dc3-0ca4-4103-a603-5855e988e3c2";
-var tenantId = "539f23a3-6819-457e-bd87-7835f4122217";
+var clientId = "bc6a5c42-f082-4b55-9a87-e765f30a1ba4";
+var tenantId = "92f4dd01-f0ea-4b5f-97f2-505c2945189c";
+
+if (debugMode)
+{
+    // ars solvendi
+    clientId = "43e13dc3-0ca4-4103-a603-5855e988e3c2";
+    tenantId = "539f23a3-6819-457e-bd87-7835f4122217";
+}
 var graphClient = GetGraphClient(clientId, tenantId);
 
 var groupId = await GetGroupId(groupName, graphClient);
@@ -24,14 +29,15 @@ var entries = await GetCalendarEntriesFromGroup(groupId, graphClient);
 bool initial = true;
 foreach (var entry in entries)
 {
-    if (initial)
+    if (debugMode && !initial)
     {
         Console.WriteLine($"{entry.Subject} ({entry.Organizer?.EmailAddress?.Name})");
         Console.WriteLine($"\t{entry.Start?.DateTime} - {entry.End?.DateTime}");
         Console.WriteLine();
-        //initial = false;
-        await CreateEventInSharedCalendar(entry, graphClient, groupId);
+        continue;
     }
+    initial = false;
+    await CreateEventInSharedCalendar(entry, graphClient, groupId);
 }
 
 static async Task CreateEventInSharedCalendar(Event newEvent, GraphServiceClient graphClient, string groupId)
