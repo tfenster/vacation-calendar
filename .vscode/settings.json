@@ -1,0 +1,4 @@
+{
+    "dotnet.defaultSolution": "vacation-calendar.sln",
+    "editor.formatOnSave": true
+}
