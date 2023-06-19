@@ -102,19 +102,38 @@ static GraphServiceClient GetGraphClient(string clientId, string tenantId)
 {
     var scopes = new[] { "User.Read", "Calendars.ReadWrite.Shared", "Group.ReadWrite.All" };
 
-    var options = new InteractiveBrowserCredentialOptions
+    if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true")
     {
-        TenantId = tenantId,
-        ClientId = clientId,
-        AuthorityHost = AzureAuthorityHosts.AzurePublicCloud,
-        RedirectUri = new Uri("http://localhost"),
-    };
+        var options = new DeviceCodeCredentialOptions
+        {
+            AuthorityHost = AzureAuthorityHosts.AzurePublicCloud,
+            ClientId = clientId,
+            TenantId = tenantId,
+            DeviceCodeCallback = (code, cancellation) =>
+            {
+                Console.WriteLine(code.Message);
+                return Task.FromResult(0);
+            },
+        };
 
-    var interactiveCredential = new InteractiveBrowserCredential(options);
+        var deviceCodeCredential = new DeviceCodeCredential(options);
 
-    var graphClient = new GraphServiceClient(interactiveCredential, scopes);
+        return new GraphServiceClient(deviceCodeCredential, scopes);
+    }
+    else
+    {
+        var options = new InteractiveBrowserCredentialOptions
+        {
+            TenantId = tenantId,
+            ClientId = clientId,
+            AuthorityHost = AzureAuthorityHosts.AzurePublicCloud,
+            RedirectUri = new Uri("http://localhost"),
+        };
 
-    return graphClient;
+        var interactiveCredential = new InteractiveBrowserCredential(options);
+
+        return new GraphServiceClient(interactiveCredential, scopes);
+    }
 }
 
 static async Task<string?> GetGroupId(string groupName, GraphServiceClient graphClient)
