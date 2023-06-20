@@ -6,7 +6,7 @@ using System.Text.Json;
 
 // m365 aad app add --name 'Vacation calendar' --redirectUris 'http://localhost/' --platform publicClient --apisDelegated 'https://graph.microsoft.com/Group.ReadWrite.All,https://graph.microsoft.com/Calendars.ReadWrite.Shared,https://graph.microsoft.com/User.Read'
 
-var debugMode = false;
+const bool debugMode = false;
 var groupName = "4PS Deutschland";
 
 // 4PS
@@ -35,7 +35,9 @@ foreach (var entry in entries)
 {
     if (debugMode)
     {
+#pragma warning disable CS0162
         Console.WriteLine($"create: {entry.Subject} ({entry.Organizer?.EmailAddress?.Name}) {entry.Start?.DateTime} - {entry.End?.DateTime}");
+#pragma warning restore CS0162
     }
     await CreateEventInSharedCalendar(entry, graphClient, groupId, mailboxSettings.TimeZone);
 }
@@ -73,7 +75,9 @@ static async Task<List<Event>> GetCalendarEntriesFromGroup(string groupId, Graph
         {
             if (debugMode)
             {
+#pragma warning disable CS0162
                 Console.WriteLine($"work on: {user.Mail} ({user.Id})");
+#pragma warning restore CS0162
             }
             if (user.AccountEnabled == false)
                 continue;
@@ -105,7 +109,9 @@ static async Task<List<Event>> GetCalendarEntriesFromGroup(string groupId, Graph
                 await eventIterator.IterateAsync();
                 if (debugMode)
                 {
+#pragma warning disable CS0162
                     Console.WriteLine($"\tfound {eventList.Count} relevant entries");
+#pragma warning restore CS0162
                 }
                 events.AddRange(eventList);
             }
@@ -184,7 +190,9 @@ static async Task<List<DirectoryObject>> GetMembers(string groupId, GraphService
         members = membersResult?.Value;
         if (debugMode)
         {
+#pragma warning disable CS0162
             Console.WriteLine($"found {(members != null ? members.Count : 0)} members for group {groupId}");
+#pragma warning restore CS0162
         }
     }
     catch (Exception ex)
@@ -216,7 +224,9 @@ static async Task CleanCalendar(string groupId, GraphServiceClient graphClient)
         await eventIterator.IterateAsync();
         if (debugMode)
         {
+#pragma warning disable CS0162
             Console.WriteLine($"found {entryList.Count} entries for filter {filter}");
+#pragma warning restore CS0162
         }
 
         foreach (var entry in entryList)
@@ -225,7 +235,9 @@ static async Task CleanCalendar(string groupId, GraphServiceClient graphClient)
             {
                 if (debugMode)
                 {
+#pragma warning disable CS0162
                     Console.WriteLine($"delete: {entry.Subject} ({entry.Organizer?.EmailAddress?.Name}) {entry.Start?.DateTime} - {entry.End?.DateTime} ({entry.Id})");
+#pragma warning restore CS0162
                 }
                 await graphClient.Groups[groupId].Calendar.Events[entry.Id].DeleteAsync();
             }
