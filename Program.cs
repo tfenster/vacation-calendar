@@ -10,40 +10,45 @@ var debugMode = false;
 var groupName = "4PS Deutschland";
 
 // 4PS
-var clientId = "bc6a5c42-f082-4b55-9a87-e765f30a1ba4";
-var tenantId = "92f4dd01-f0ea-4b5f-97f2-505c2945189c";
+var clientId = "bc6a5c42-f082-4b55-9a87-e765f30a1ba4"; // "43e13dc3-0ca4-4103-a603-5855e988e3c2" ars solvendi
+var tenantId = "92f4dd01-f0ea-4b5f-97f2-505c2945189c"; // "539f23a3-6819-457e-bd87-7835f4122217" ars solvendi
 
-if (debugMode)
-{
-    // ars solvendi
-    clientId = "43e13dc3-0ca4-4103-a603-5855e988e3c2";
-    tenantId = "539f23a3-6819-457e-bd87-7835f4122217";
-}
 var graphClient = GetGraphClient(clientId, tenantId);
 
 var groupId = await GetGroupId(groupName, graphClient);
 if (groupId == null) return;
 await CleanCalendar(groupId, graphClient);
 var entries = await GetCalendarEntriesFromGroup(groupId, graphClient);
+MailboxSettings? mailboxSettings = null;
+try
+{
+    mailboxSettings = await graphClient.Me.MailboxSettings.GetAsync();
+}
+catch (Exception ex)
+{
+    HandleException("Couldn't get mailbox settings", ex);
+}
+if (mailboxSettings == null)
+    return;
 
-bool initial = true;
 foreach (var entry in entries)
 {
-    if (debugMode && !initial)
+    if (debugMode)
     {
-        Console.WriteLine($"{entry.Subject} ({entry.Organizer?.EmailAddress?.Name})");
-        Console.WriteLine($"\t{entry.Start?.DateTime} - {entry.End?.DateTime}");
-        Console.WriteLine();
-        continue;
+        Console.WriteLine($"create: {entry.Subject} ({entry.Organizer?.EmailAddress?.Name}) {entry.Start?.DateTime} - {entry.End?.DateTime}");
     }
-    initial = false;
-    await CreateEventInSharedCalendar(entry, graphClient, groupId);
+    await CreateEventInSharedCalendar(entry, graphClient, groupId, mailboxSettings.TimeZone);
 }
 
-static async Task CreateEventInSharedCalendar(Event newEvent, GraphServiceClient graphClient, string groupId)
+static async Task CreateEventInSharedCalendar(Event newEvent, GraphServiceClient graphClient, string groupId, string? timezone)
 {
     try
     {
+        if (timezone != null && newEvent.IsAllDay != null && (bool)newEvent.IsAllDay)
+        {
+            newEvent.Start!.TimeZone = timezone;
+            newEvent.End!.TimeZone = timezone;
+        }
         await graphClient.Groups[groupId].Calendar.Events.PostAsync(new Event()
         {
             Subject = $"{newEvent.Subject} ({newEvent.Organizer?.EmailAddress?.Name})",
@@ -66,6 +71,12 @@ static async Task<List<Event>> GetCalendarEntriesFromGroup(string groupId, Graph
     {
         if (member is User user)
         {
+            if (debugMode)
+            {
+                Console.WriteLine($"work on: {user.Mail} ({user.Id})");
+            }
+            if (user.AccountEnabled == false)
+                continue;
             var userEmail = user.Mail;
             var userId = user.Id;
             try
@@ -92,6 +103,10 @@ static async Task<List<Event>> GetCalendarEntriesFromGroup(string groupId, Graph
                     }
                 );
                 await eventIterator.IterateAsync();
+                if (debugMode)
+                {
+                    Console.WriteLine($"\tfound {eventList.Count} relevant entries");
+                }
                 events.AddRange(eventList);
             }
             catch (Exception ex)
@@ -106,7 +121,7 @@ static async Task<List<Event>> GetCalendarEntriesFromGroup(string groupId, Graph
 
 static GraphServiceClient GetGraphClient(string clientId, string tenantId)
 {
-    var scopes = new[] { "User.Read", "Calendars.ReadWrite.Shared", "Group.ReadWrite.All" };
+    var scopes = new[] { "User.Read", "Calendars.ReadWrite.Shared", "Group.ReadWrite.All", "MailboxSettings.Read" };
 
     if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true")
     {
@@ -167,6 +182,10 @@ static async Task<List<DirectoryObject>> GetMembers(string groupId, GraphService
     {
         var membersResult = await graphClient.Groups[groupId].Members.GetAsync();
         members = membersResult?.Value;
+        if (debugMode)
+        {
+            Console.WriteLine($"found {(members != null ? members.Count : 0)} members for group {groupId}");
+        }
     }
     catch (Exception ex)
     {
@@ -178,19 +197,49 @@ static async Task<List<DirectoryObject>> GetMembers(string groupId, GraphService
 
 static async Task CleanCalendar(string groupId, GraphServiceClient graphClient)
 {
-    var entries = await graphClient.Groups[groupId].Calendar.Events.GetAsync();
-    if (entries?.Value == null) return;
-    foreach (var entry in entries.Value)
+    var filter = $"(contains(subject,'Urlaub') or contains(subject,'Vacation') or contains(subject,'urlaub') or contains(subject,'vacation')) and start/dateTime ge '{DateTime.Now.AddMonths(-1).ToUniversalTime().ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fff'Z'")}' and end/dateTime le '{DateTime.Now.AddMonths(6).ToUniversalTime().ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fff'Z'")}'";
+    try
     {
-        try
+        var entriesToDelete = await graphClient.Groups[groupId].Calendar.Events.GetAsync(requestConfiguration =>
         {
-            await graphClient.Groups[groupId].Calendar.Events[entry.Id].DeleteAsync();
+            requestConfiguration.QueryParameters.Filter = filter;
+        });
+        if (entriesToDelete?.Value == null) return;
+        var entryList = new List<Event>();
+        var eventIterator = PageIterator<Event, EventCollectionResponse>.CreatePageIterator(
+            graphClient, entriesToDelete, (e) =>
+            {
+                entryList.Add(e);
+                return true;
+            }
+        );
+        await eventIterator.IterateAsync();
+        if (debugMode)
+        {
+            Console.WriteLine($"found {entryList.Count} entries for filter {filter}");
         }
-        catch (Exception ex)
+
+        foreach (var entry in entryList)
         {
-            HandleException($"Couldn't delete event {entry.Id}", ex);
+            try
+            {
+                if (debugMode)
+                {
+                    Console.WriteLine($"delete: {entry.Subject} ({entry.Organizer?.EmailAddress?.Name}) {entry.Start?.DateTime} - {entry.End?.DateTime} ({entry.Id})");
+                }
+                await graphClient.Groups[groupId].Calendar.Events[entry.Id].DeleteAsync();
+            }
+            catch (Exception ex)
+            {
+                HandleException($"Couldn't delete event {entry.Id}", ex);
+            }
         }
     }
+    catch (Exception ex)
+    {
+        HandleException($"Couldn't get calendar entries for filter {filter}", ex);
+    }
+
 }
 
 static void HandleException(string msg, Exception ex)
