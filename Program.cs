@@ -42,6 +42,9 @@ foreach (var entry in entries)
     await CreateEventInSharedCalendar(entry, graphClient, groupId, mailboxSettings.TimeZone);
 }
 
+Console.WriteLine("Press any key to exit...");
+Console.ReadKey();
+
 static async Task CreateEventInSharedCalendar(Event newEvent, GraphServiceClient graphClient, string groupId, string? timezone)
 {
     try
