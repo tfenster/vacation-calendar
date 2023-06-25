@@ -7,6 +7,7 @@ using System.Text.Json;
 // m365 aad app add --name 'Vacation calendar' --redirectUris 'http://localhost/' --platform publicClient --apisDelegated 'https://graph.microsoft.com/Group.ReadWrite.All,https://graph.microsoft.com/Calendars.ReadWrite.Shared,https://graph.microsoft.com/User.Read'
 
 const bool debugMode = false;
+const string vacationFilter = "contains(subject,'Urlaub') or contains(subject,'Vacation') or contains(subject,'Vakatie') or contains(subject,'urlaub') or contains(subject,'vacation') or contains(subject,'vakatie')";
 var groupName = "4PS Deutschland";
 
 // 4PS
@@ -94,7 +95,7 @@ static async Task<List<Event>> GetCalendarEntriesFromGroup(string groupId, Graph
                          .ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fff'Z'");
                     requestConfiguration.QueryParameters.EndDateTime = DateTime.Now.AddMonths(6).ToUniversalTime()
                          .ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fff'Z'");
-                    requestConfiguration.QueryParameters.Filter = "contains(subject,'Urlaub') or contains(subject,'Vacation') or contains(subject,'urlaub') or contains(subject,'vacation')";
+                    requestConfiguration.QueryParameters.Filter = vacationFilter;
                 });
                 if (userEvents == null)
                     continue;
@@ -208,7 +209,7 @@ static async Task<List<DirectoryObject>> GetMembers(string groupId, GraphService
 
 static async Task CleanCalendar(string groupId, GraphServiceClient graphClient)
 {
-    var filter = $"(contains(subject,'Urlaub') or contains(subject,'Vacation') or contains(subject,'urlaub') or contains(subject,'vacation')) and start/dateTime ge '{DateTime.Now.AddMonths(-1).ToUniversalTime().ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fff'Z'")}' and end/dateTime le '{DateTime.Now.AddMonths(6).ToUniversalTime().ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fff'Z'")}'";
+    var filter = $"({vacationFilter}) and start/dateTime ge '{DateTime.Now.AddMonths(-1).ToUniversalTime().ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fff'Z'")}' and end/dateTime le '{DateTime.Now.AddMonths(6).ToUniversalTime().ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fff'Z'")}'";
     try
     {
         var entriesToDelete = await graphClient.Groups[groupId].Calendar.Events.GetAsync(requestConfiguration =>
