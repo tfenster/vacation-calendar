@@ -4,7 +4,7 @@ using Microsoft.Graph.Models;
 using Microsoft.Graph.Models.ODataErrors;
 using System.Text.Json;
 
-// m365 aad app add --name 'Vacation calendar' --redirectUris 'http://localhost/' --platform publicClient --apisDelegated 'https://graph.microsoft.com/Group.ReadWrite.All,https://graph.microsoft.com/Calendars.ReadWrite.Shared,https://graph.microsoft.com/User.Read'
+// m365 aad app add --name 'Vacation calendar' --redirectUris 'http://localhost/' --platform publicClient --apisDelegated 'https://graph.microsoft.com/Group.ReadWrite.All,https://graph.microsoft.com/Calendars.ReadWrite.Shared,https://graph.microsoft.com/User.Read,https://graph.microsoft.com/User.Read.All,https://graph.microsoft.com/MailboxSettings.Read'
 
 const bool debugMode = false;
 const string vacationFilter = "contains(subject,'Urlaub') or contains(subject,'Vacation') or contains(subject,'Vakatie') or contains(subject,'urlaub') or contains(subject,'vacation') or contains(subject,'vakatie')";
